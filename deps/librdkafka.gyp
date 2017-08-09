@@ -1,6 +1,13 @@
 {
   'variables': {
-    "WITH_SASL%": "<!(echo ${WITH_SASL:-1})"
+    'conditions': [
+      [ 'OS=="win"', {
+        "WITH_SASL%": "<!(IF DEFINED WITH_SASL (echo %WITH_SASL%) ELSE (echo 1))"
+      }],
+      [ 'OS!="win"', {
+        "WITH_SASL%": "<!(echo ${WITH_SASL:-1})"
+      }]
+    ]
   },
   'targets': [
     {
@@ -13,10 +20,42 @@
       "dependencies": [
         "librdkafka"
       ],
-      'sources': [
-         '<!@(find librdkafka/src-cpp -name *.cpp)'
-      ],
       "conditions": [
+        [ 'OS!="win"', {
+          "sources": [ "<!@(find librdkafka/src-cpp -name *.cpp)", ],
+        }],
+        [ 'OS=="win"', {
+          "sources": [ "<!@(..\\findwin librdkafka\\src-cpp *.cpp)", ],
+          'configurations': {
+            'Debug': {
+              'msvs_settings': {
+                'VCLinkerTool': {
+                  'SetChecksum': 'true'
+                },
+                'VCCLCompilerTool': {
+                  'RuntimeTypeInfo': 'true',
+                  'RuntimeLibrary': '1', # /MTd
+                  'InlineFunctionExpansion': 2 # /Ob2
+                }
+              },
+            },
+            'Release': {
+              'msvs_settings': {
+                'VCLinkerTool': {
+                  'SetChecksum': 'true'
+                },
+                'VCCLCompilerTool': {
+                  'RuntimeTypeInfo': 'true',
+                  'RuntimeLibrary': '0', # /MT
+                  'InlineFunctionExpansion': 2 # /Ob2
+                }
+              },
+            }
+          },
+          'defines': [
+            'LIBRDKAFKA_STATICLIB'
+          ]
+        }],
         [
           'OS=="linux"',
           {
@@ -107,11 +146,32 @@
         [
           'OS=="win"',
           {
-            'msvs_settings': {
-              'VCLinkerTool': {
-                 'SetChecksum': 'true'
+            'configurations': {
+              'Debug': {
+                'msvs_settings': {
+                  'VCLinkerTool': {
+                    'SetChecksum': 'true'
+                  },
+                  'VCCLCompilerTool': {
+                    'RuntimeTypeInfo': 'true',
+                    'RuntimeLibrary': '1', # /MTd
+                    'InlineFunctionExpansion': 2 # /Ob2
+                  }
+                },
+              },
+              'Release': {
+                'msvs_settings': {
+                  'VCLinkerTool': {
+                    'SetChecksum': 'true'
+                  },
+                  'VCCLCompilerTool': {
+                    'RuntimeTypeInfo': 'true',
+                    'RuntimeLibrary': '0', # /MT
+                    'InlineFunctionExpansion': 2 # /Ob2
+                  }
+                },
               }
-            },
+            }
           }
         ],
         [ 'OS!="win" and <(WITH_SASL)==1',
@@ -124,15 +184,18 @@
         [ 'OS=="win" and <(WITH_SASL)==1',
           {
             'sources': [
-              '<!@(find librdkafka/src -name rdkafka_sasl*.c ! -name rdkafka_sasl_cyrus*.c )'
+              "<!@(..\\findwin librdkafka\\src rdkafka_sasl*.c rdkafka_sasl_cyrus)"
             ]
           }
-        ]
+        ],
+        [ 'OS!="win"', {
+          "sources": [ '<!@(find librdkafka/src -name *.c ! -name rdkafka_sasl* )', ],
+          'cflags!': [ '-fno-rtti' ]
+        }],
+        [ 'OS=="win"', {
+          "sources": [ "<!@(..\\findwin librdkafka\\src *.c rdkafka_sasl)", ]
+        }]
       ],
-      'sources': [
-         '<!@(find librdkafka/src -name *.c ! -name rdkafka_sasl* )'
-      ],
-      'cflags!': [ '-fno-rtti' ],
     },
     {
       "target_name": "librdkafka_config",

@@ -1,19 +1,58 @@
 {
   "variables": {
       # may be redefined in command line on configuration stage
-      "BUILD_LIBRDKAFKA%": "<!(echo ${BUILD_LIBRDKAFKA:-1})",
-      "WITH_SASL%": "<!(echo ${WITH_SASL:-1})",
-      "WITH_LZ4%": "<!(echo ${WITH_LZ4:-0})"
+      'conditions': [
+        [ 'OS=="win"', {
+          "BUILD_LIBRDKAFKA%": "<!(IF DEFINED BUILD_LIBRDKAFKA (echo %BUILD_LIBRDKAFKA%) ELSE (echo 1))",
+          "WITH_SASL%": "<!(IF DEFINED WITH_SASL (echo %WITH_SASL%) ELSE (echo 1))",
+          "WITH_LZ4%": "<!(IF DEFINED WITH_LZ4 (echo %WITH_LZ4%) ELSE (echo 0))"
+        }],
+        [ 'OS!="win"', {
+          "BUILD_LIBRDKAFKA%": "<!(echo ${BUILD_LIBRDKAFKA:-1})",
+          "WITH_SASL%": "<!(echo ${WITH_SASL:-1})",
+          "WITH_LZ4%": "<!(echo ${WITH_LZ4:-0})"
+        }]
+      ]
   },
   "targets": [
     {
       "target_name": "node-librdkafka",
-      "sources": [ "<!@(ls -1 src/*.cc)", ],
       "include_dirs": [
         "<!(node -e \"require('nan')\")",
         "<(module_root_dir)/"
       ],
       'conditions': [
+        [ 'OS!="win"', {
+          "sources": [ "<!@(ls -1 src/*.cc)", ]
+        }],
+        [ 'OS=="win"', {
+          "sources": [ '<!@(findwin src *.cc)' ],
+          "include_dirs": [ '<(module_root_dir)/src/win32' ],
+          'configurations': {
+            'Debug': {
+              'msvs_settings': {
+                'VCLinkerTool': {
+                  'SetChecksum': 'true'
+                },
+                'VCCLCompilerTool': {
+                  'RuntimeTypeInfo': 'true',
+                  'RuntimeLibrary': '1', # /MTd
+                }
+              },
+            },
+            'Release': {
+              'msvs_settings': {
+                'VCLinkerTool': {
+                  'SetChecksum': 'true'
+                },
+                'VCCLCompilerTool': {
+                  'RuntimeTypeInfo': 'true',
+                  'RuntimeLibrary': '0', # /MT
+                }
+              },
+            }
+          }
+        }],
         [ "<(BUILD_LIBRDKAFKA)==1",
             {
                 "dependencies": [
@@ -41,14 +80,6 @@
             ],
             'cflags_cc!': [
               '-fno-rtti'
-            ]
-          }
-        ],
-        [
-          'OS=="win"',
-          {
-            'cflags_cc' : [
-              '-std=c++11'
             ]
           }
         ],
